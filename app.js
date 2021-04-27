@@ -1,21 +1,39 @@
-const express = require('express');
-const app =express();
-const port = process.env.PORT;
+const express = require('express')
+const bodyParser = require('body-parser');
+require('body-parser-xml')(bodyParser);
 
-const{client} = require('pg');
-const client = new Client({
-	connectionString: process.env.DATABASE_URL,
-	ssl: true
-})
-client.connect();
+const app = express();
+const port = process.env.PORT
 
-app.get('/',(req,res)=>{
-	client.query('INSERT into visits (created_at) values (NOW())',(err,response)=> {
-		if (err){
-			throw err;
-		}
-		return res;
-	})
-	return res.send('Successfully Recorded the Visit');
-})
-app.listen(port,()=>{console.log('SERVER STARTED')});
+app.use(bodyParser.xml());
+app.listen(port, () => console.log(`App started.`));
+
+const outboundService = require('./utils/outbound_service');
+
+app.post('/case', (req, res) => {
+    try {
+        let outboundList = outboundService.processOutbound(req.body);
+        
+        console.log('outboundList', outboundList);
+
+        if(outboundList[0].Priority === 'Low'){
+            return res.send(outboundService.nack);
+        }
+
+        return res.send(outboundService.ack);
+    } catch (exception) {
+        return res.send(outboundService.nack);
+    }
+});
+
+// Challenge code:
+app.post('/case-comment', (req, res) => {
+    try {
+        let outboundList = outboundService.processOutbound(req.body);
+        console.log('outboundList', outboundList);
+
+        return res.send(outboundService.ack);
+    } catch (exception) {
+        return res.send(outboundService.nack);
+    }
+});
